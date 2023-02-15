@@ -1,0 +1,23 @@
+[package]
+name = "lulu"
+version = "0.0.1"
+edition = "2021"
+authors = ["alyrow"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4.23"
+clap = { version = "4.1.4", features = ["derive"] }
+deb-rust = { git = "https://codeberg.org/alyrow/deb-rust.git" }
+fork = "0.1.20"
+git2 = "0.16.1"
+libc = "0.2.139"
+log = "0.4.17"
+rust-apt = "0.5.1"
+serde = {version = "1.0.152", features = ["derive"]}
+simple_logger = "4.0.0"
+sudo = "0.6.0"
+toml = "0.7.2"
+yansi = "0.5.1"
+

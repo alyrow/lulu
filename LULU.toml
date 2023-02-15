@@ -1,0 +1,34 @@
+[package]
+name = "lulu-git"
+maintainers = ["alyrow"]
+description = "Concept of package manager built on top of apt for handling git repositories"
+url = "localhost"
+source = "https://github.com/alyrow/lulu.git"
+arch = ["any"]
+license = []
+provides = ["lulu"]
+
+[dependencies.runtime]
+fakeroot = { is = "APT" }
+"libapt-pkg6.0" = { is = "APT" }
+
+[dependencies.build]
+libapt-pkg-dev = { is = "APT" }
+
+[dependencies.optional]
+
+[script]
+prepare = '''
+'''
+build = '''
+export PATH=$PATH:$HOME/.cargo/bin/
+cargo update
+cargo build --release
+'''
+check = '''
+
+'''
+package = '''
+mkdir -p $pkgdir/usr/bin
+install -Dm755 target/release/lulu $pkgdir/usr/bin/lulu
+'''
