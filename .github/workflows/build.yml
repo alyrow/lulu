@@ -1,0 +1,41 @@
+name: Build lulu
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  u20_04:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        fetch-depth: 0
+      - name: Install necessary build dependencies
+        run: sudo apt update && sudo apt install -y libapt-pkg-dev
+      - name: Build
+        run: cargo run --verbose -- install -n
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          name: lulu-ubuntu-20.04.deb
+          path: '*.deb'
+
+  u22_04:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+        fetch-depth: 0
+      - name: Install necessary build dependencies
+        run: sudo apt update && sudo apt install -y libapt-pkg-dev
+      - name: Build
+        run: cargo run --verbose -- install -n
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3.1.2
+        with:
+          name: lulu-ubuntu-22.04.deb
+          path: '*.deb'
