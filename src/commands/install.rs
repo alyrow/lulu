@@ -24,7 +24,7 @@ use crate::{
     success, tip, title, warning,
 };
 
-fn install_local() {
+fn install_local(no_install: bool) {
     let lulu_file = File::open("LULU.toml");
     match lulu_file {
         Ok(mut f) => {
@@ -32,7 +32,7 @@ fn install_local() {
             f.read_to_string(&mut contents).unwrap();
             let deserialized: Lulu = toml::from_str(&contents).unwrap();
             println!("deserialized = {:?}", deserialized);
-            install_with_ctx(env::current_dir().unwrap(), deserialized);
+            install_with_ctx(env::current_dir().unwrap(), deserialized, no_install);
         }
         Err(e) => {
             error!("LULU.toml is not readable");
@@ -41,7 +41,7 @@ fn install_local() {
     }
 }
 
-fn install_git(url: String) {
+fn install_git(url: String, no_install: bool) {
     let path = env::temp_dir().join(format!("lulu_{}", Utc::now().timestamp()));
     let mut builder = DirBuilder::new();
     builder.recursive(true);
@@ -53,7 +53,7 @@ fn install_git(url: String) {
         Paint::cyan(path.clone().display()).underline()
     );
 
-    let _repo = match Repository::clone(&url, path) {
+    let _repo = match Repository::clone(&url, path.clone()) {
         Ok(repo) => repo,
         Err(e) => {
             error!("Failed to clone repository");
@@ -63,7 +63,7 @@ fn install_git(url: String) {
     success!("Success!");
 }
 
-fn install_with_ctx(path: PathBuf, lulu: Lulu) {
+fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
     let repo = match Repository::open(path.clone()) {
         Ok(repo) => repo,
         Err(_) => {
@@ -298,34 +298,37 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu) {
     };
 
     // Installing builded package
-    title!("📦", "Installing {}", Paint::cyan(lulu.package.name.clone()).italic());
-    let cache = match Cache::new::<&str>(&[Path::new(&format!("{}-{}.deb", lulu.package.name, version)).to_str().expect("Path should exist")]) {
-        Ok(c) => c,
-        Err(_) => todo!(),
-    };
-    let package = match cache.get(&lulu.package.name) {
-        Some(p) => p,
-        None => {
-            error!("Package not found");
-            panic!("Package not found");
-        },
-    };
 
-    println!("{}", package.installed().map_or("Not installed".to_string(), |v| v.version().to_string()));
-    package.mark_install(true, true);
-    package.protect();
+    if !no_install {
+        title!("📦", "Installing {}", Paint::cyan(lulu.package.name.clone()).italic());
+        let cache = match Cache::new::<&str>(&[Path::new(&format!("{}-{}.deb", lulu.package.name, version)).to_str().expect("Path should exist")]) {
+            Ok(c) => c,
+            Err(_) => todo!(),
+        };
+        let package = match cache.get(&lulu.package.name) {
+            Some(p) => p,
+            None => {
+                error!("Package not found");
+                panic!("Package not found");
+            }
+        };
 
-    cache.resolve(true).unwrap();
+        println!("{}", package.installed().map_or("Not installed".to_string(), |v| v.version().to_string()));
+        package.mark_install(true, true);
+        package.protect();
 
-    let mut acquire_progress = AptAcquireProgress::new_box();
-    let mut install_progress = AptInstallProgress::new_box();
+        cache.resolve(true).unwrap();
 
-    match cache.get_archives(&mut acquire_progress) {
-        Ok(_) => match cache.do_install(&mut install_progress) {
-            Ok(_) => (),
+        let mut acquire_progress = AptAcquireProgress::new_box();
+        let mut install_progress = AptInstallProgress::new_box();
+
+        match cache.get_archives(&mut acquire_progress) {
+            Ok(_) => match cache.do_install(&mut install_progress) {
+                Ok(_) => (),
+                Err(e) => panic!("{:?}", e),
+            },
             Err(e) => panic!("{:?}", e),
-        },
-        Err(e) => panic!("{:?}", e),
+        }
     }
 
     success!("Done");
@@ -417,11 +420,11 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
     env::set_current_dir(basedir.display().to_string()).unwrap();
 }
 
-pub fn install(name: Option<String>) {
+pub fn install(name: Option<String>, no_install: bool) {
     match name {
         Some(n) => {
             if n.contains("://") || n.starts_with("git@") {
-                install_git(n)
+                install_git(n, no_install)
             } else {
                 eprintln!(
                     "{}{}",
@@ -431,6 +434,6 @@ pub fn install(name: Option<String>) {
                 todo!()
             }
         }
-        None => install_local(),
+        None => install_local(no_install),
     }
 }

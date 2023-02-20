@@ -28,6 +28,10 @@ enum Commands {
         /// Can be a package name if lulu is connected to a repository, a git repository with LULU.toml file or can be blank in which case it will fallback
         /// to the current directory (if a valid LULU.toml file exists).
         name: Option<String>,
+
+        /// Do not install built package
+        #[arg(short, long)]
+        no_install: bool,
     },
 }
 
@@ -44,9 +48,9 @@ fn main() {
     }
 
     match &cli.command {
-        Some(Commands::Install { name }) => {
+        Some(Commands::Install { name, no_install }) => {
             println!("{:?}", name);
-            install(name.to_owned());
+            install(name.to_owned(), no_install.to_owned());
         }
         None => {}
     }
