@@ -186,13 +186,13 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
 
     // BUILD
 
+    let mut status: i32 = 0;
     match fork() {
         Ok(Fork::Parent(child)) => {
             println!(
                 "Continuing execution in parent process, new child has pid: {}",
                 child
             );
-            let mut status: i32 = 0;
             unsafe { libc::waitpid(child, &mut status, 0) };
             println!("Status is {}", status);
         }
@@ -298,8 +298,13 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
         }
     };
 
-    // Installing builded package
+    // Verifying if status is ok
+    if status != 0 {
+        error!("Something went wrong");
+        panic!("Something went wrong");
+    }
 
+    // Installing built package
     if !no_install {
         title!("📦", "Installing {}", Paint::cyan(lulu.package.name.clone()).italic());
         let cache = match Cache::new::<&str>(&[Path::new(&format!("{}-{}.deb", lulu.package.name, version)).to_str().expect("Path should exist")]) {
