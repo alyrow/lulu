@@ -60,7 +60,8 @@ fn install_git(url: String, no_install: bool) {
             panic!("{:?}", e)
         }
     };
-    success!("Success!");
+    env::set_current_dir(path.display().to_string()).unwrap();
+    install_local(no_install);
 }
 
 fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
