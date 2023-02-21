@@ -1,11 +1,15 @@
 mod package;
 mod commands;
 mod utils;
+mod db;
+mod model;
 
+use std::path::Path;
 use clap::{Parser, Subcommand};
+use serde::Serialize;
 use yansi::Paint;
 
-use crate::commands::install;
+use crate::commands::{install, setup, update};
 
 /// Concept of package manager built on top of apt for handling git repositories
 #[derive(Parser)]
@@ -33,6 +37,16 @@ enum Commands {
         #[arg(short, long)]
         no_install: bool,
     },
+    /// Setup lulu db
+    ///
+    /// Should be executed only once. It will create and init db at /var/log/lulu/db
+    Setup {},
+    /// Update each repository and eventually inform about possible upgrades
+    Update {
+        /// Do not check for upgrades
+        #[arg(short, long)]
+        no_check: bool,
+    }
 }
 
 fn main() {
@@ -52,6 +66,21 @@ fn main() {
             println!("{:?}", name);
             install(name.to_owned(), no_install.to_owned());
         }
-        None => {}
+        Some(Commands::Setup { .. }) => {
+            setup();
+        }
+        Some(Commands::Update { no_check }) => {
+            update(no_check.to_owned());
+        }
+        None => {
+            let fm = db::Db::new(Path::new("/var/lib/lulu/db").to_path_buf()).unwrap();
+            fm.collection("test").add(Test { name: "alyrow".to_string(), n: 22 }).unwrap();
+        }
     }
+}
+
+#[derive(Serialize)]
+struct Test {
+    name: String,
+    n: u8,
 }
