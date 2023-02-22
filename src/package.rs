@@ -1,13 +1,12 @@
 use std::collections::BTreeMap;
 
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Lulu {
     pub package: Package,
     pub dependencies: Dependencies,
-    pub script: Script
+    pub script: Script,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -23,14 +22,14 @@ pub struct Package {
     pub preinst: Option<String>,
     pub postinst: Option<String>,
     pub prerm: Option<String>,
-    pub postrm: Option<String>
+    pub postrm: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Dependencies {
     pub runtime: BTreeMap<String, Dependency>,
     pub build: BTreeMap<String, Dependency>,
-    pub optional: BTreeMap<String, Dependency>
+    pub optional: BTreeMap<String, Dependency>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,16 +37,17 @@ pub struct Script {
     pub prepare: Option<String>,
     pub build: Option<String>,
     pub check: Option<String>,
-    pub package: String
+    pub package: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Dependency {
     pub is: DependencyType,
-    pub git: Option<String>
+    pub git: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum DependencyType {
-    APT, GIT
+    APT,
+    GIT,
 }

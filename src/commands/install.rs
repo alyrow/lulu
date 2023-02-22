@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::{DirBuilder, File},
-    path::{PathBuf, Path},
+    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -306,8 +306,18 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
 
     // Installing built package
     if !no_install {
-        title!("📦", "Installing {}", Paint::cyan(lulu.package.name.clone()).italic());
-        let cache = match Cache::new::<&str>(&[Path::new(&format!("{}-{}.deb", lulu.package.name, version)).to_str().expect("Path should exist")]) {
+        title!(
+            "📦",
+            "Installing {}",
+            Paint::cyan(lulu.package.name.clone()).italic()
+        );
+        let cache = match Cache::new::<&str>(&[Path::new(&format!(
+            "{}-{}.deb",
+            lulu.package.name, version
+        ))
+        .to_str()
+        .expect("Path should exist")])
+        {
             Ok(c) => c,
             Err(_) => todo!(),
         };
@@ -319,7 +329,12 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
             }
         };
 
-        println!("{}", package.installed().map_or("Not installed".to_string(), |v| v.version().to_string()));
+        println!(
+            "{}",
+            package
+                .installed()
+                .map_or("Not installed".to_string(), |v| v.version().to_string())
+        );
         package.mark_install(true, true);
         package.protect();
 

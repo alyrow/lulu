@@ -169,8 +169,12 @@ pub mod git {
         }
         Ok(())
     }
-    
-    pub fn pull(repo: git2::Repository, remote_name: &str, remote_branch: &str) -> Result<(), git2::Error> {
+
+    pub fn pull(
+        repo: git2::Repository,
+        remote_name: &str,
+        remote_branch: &str,
+    ) -> Result<(), git2::Error> {
         let mut remote = repo.find_remote(remote_name)?;
         let fetch_commit = do_fetch(&repo, &[remote_branch], &mut remote)?;
         do_merge(&repo, &remote_branch, fetch_commit)

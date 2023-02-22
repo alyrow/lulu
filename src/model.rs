@@ -9,5 +9,5 @@ pub struct Config {
 #[derive(Deserialize)]
 pub struct Repository {
     pub name: String,
-    pub source: String
+    pub source: String,
 }

@@ -1,12 +1,12 @@
-mod package;
 mod commands;
-mod utils;
 mod db;
 mod model;
+mod package;
+mod utils;
 
-use std::path::Path;
 use clap::{Parser, Subcommand};
 use serde::Serialize;
+use std::path::Path;
 use yansi::Paint;
 
 use crate::commands::{install, setup, update};
@@ -46,11 +46,10 @@ enum Commands {
         /// Do not check for upgrades
         #[arg(short, long)]
         no_check: bool,
-    }
+    },
 }
 
 fn main() {
-
     simple_logger::init_with_level(log::Level::Trace).unwrap();
 
     let cli = Cli::parse();
