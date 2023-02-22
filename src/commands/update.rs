@@ -1,5 +1,5 @@
 use crate::db::{Condition, Db, Where};
-use crate::model::{Config, DbRepository};
+use crate::model::{Config, DbPackage};
 use crate::utils::lulu::lulu_file;
 use crate::{error, success, tip, title, warning};
 use serde_json::Value;
@@ -169,7 +169,7 @@ pub fn update(_no_check: bool) {
                             .clone()
                             .collection("packages")
                             .doc(lulu.package.name.as_str())
-                            .set(DbRepository {
+                            .set(DbPackage {
                                 repository: repo.name.clone(),
                                 path: dir.path().display().to_string(),
                             }) {

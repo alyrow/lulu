@@ -13,7 +13,7 @@ pub struct Repository {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct DbRepository {
+pub struct DbPackage {
     pub repository: String,
     pub path: String,
 }
