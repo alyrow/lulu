@@ -41,7 +41,7 @@ fn install_local(ctx: Context) {
 }
 
 fn install_git(url: String, ctx: Context) {
-    let path = env::temp_dir().join(format!("lulu_{}", Utc::now().timestamp()));
+    let path = env::temp_dir().join(format!("lulu_{}", url.replace(":", "_").replace("/", "_")));
     let mut builder = DirBuilder::new();
     builder.recursive(true);
     builder.create(path.clone().into_os_string()).unwrap();
@@ -84,7 +84,7 @@ fn install_db(name: String, ctx: Context) {
         }
     };
 
-    let path = env::temp_dir().join(format!("lulu_{}", Utc::now().timestamp()));
+    let path = env::temp_dir().join(format!("lulu_{}", name));
     let mut builder = DirBuilder::new();
     builder.recursive(true);
     builder.create(path.clone().into_os_string()).unwrap();
