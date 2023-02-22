@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -10,4 +10,10 @@ pub struct Config {
 pub struct Repository {
     pub name: String,
     pub source: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DbRepository {
+    pub repository: String,
+    pub path: String,
 }

@@ -1,6 +1,9 @@
-use crate::model::Config;
-use crate::{error, tip, title, warning};
-use std::io::Read;
+use crate::db::{Condition, Db, Where};
+use crate::model::{Config, DbRepository};
+use crate::utils::lulu::lulu_file;
+use crate::{error, success, tip, title, warning};
+use serde_json::Value;
+use std::io::{Error, Read};
 use std::path::Path;
 use yansi::{Color, Paint};
 
@@ -16,6 +19,13 @@ pub fn update(_no_check: bool) {
             }
         }
     }
+    let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+        Ok(db) => db,
+        Err(e) => {
+            error!("Failed to open database");
+            panic!("{:?}", e);
+        }
+    };
     title!("📁", "Getting repositories from config");
     let file = match std::fs::File::open(Path::new("/etc/lulu.conf")) {
         Ok(f) => f,
@@ -64,11 +74,16 @@ pub fn update(_no_check: bool) {
             }
         };
 
-        let repo = match git2::Repository::open(path.clone()) {
+        let mut need_update = false;
+
+        let git_repo = match git2::Repository::open(path.clone()) {
             Ok(r) => r,
             Err(_) => match std::fs::create_dir_all(path.as_path()) {
-                Ok(_) => match git2::Repository::clone(repo.source.as_str(), path) {
-                    Ok(r) => r,
+                Ok(_) => match git2::Repository::clone(repo.source.as_str(), path.clone()) {
+                    Ok(r) => {
+                        need_update = true;
+                        r
+                    }
                     Err(_) => {
                         error!("Can't clone repository");
                         return;
@@ -81,7 +96,7 @@ pub fn update(_no_check: bool) {
             },
         };
 
-        let local_oid = match repo.head() {
+        let local_oid = match git_repo.head() {
             Ok(head) => match head.target() {
                 None => {
                     error!("The commit should point to a ref");
@@ -96,15 +111,79 @@ pub fn update(_no_check: bool) {
         };
 
         if remote_oid != local_oid {
-            match crate::utils::git::pull(repo, "origin", "master") {
+            match crate::utils::git::pull(git_repo, "origin", "master") {
                 // TODO get remote from config
                 Ok(_) => {
-                    // TODO Update db
+                    need_update = true;
                 }
                 Err(_) => {
                     error!("Failed to update repository");
+                    return;
                 }
             }
         }
+
+        if need_update {
+            match db.clone().collection("packages").wherr(
+                "repository".to_string(),
+                Condition::Equal,
+                Value::from(repo.name.clone()),
+            ) {
+                Ok(w) => w,
+                Err(_) => {
+                    error!("Failed to update repository");
+                    return;
+                }
+            }
+            .get()
+            .iter()
+            .for_each(|doc| {
+                let _ = doc.doc.clone().delete();
+            });
+            let rd = match std::fs::read_dir(path) {
+                Ok(rd) => rd,
+                Err(_) => {
+                    error!("Failed to update repository");
+                    return;
+                }
+            };
+            rd.for_each(|dir| {
+                if dir.is_ok() {
+                    let dir = dir.unwrap();
+                    if dir.path().is_dir() && dir.path().join("LULU.toml").is_file() {
+                        let lulu = match lulu_file(dir.path().join("LULU.toml")) {
+                            Ok(f) => {
+                                if f.is_ok() {
+                                    f.unwrap()
+                                } else {
+                                    error!("LULU.toml is not deserializable");
+                                    return;
+                                }
+                            }
+                            Err(_) => {
+                                error!("LULU.toml is not readable");
+                                return;
+                            }
+                        };
+                        match db
+                            .clone()
+                            .collection("packages")
+                            .doc(lulu.package.name.as_str())
+                            .set(DbRepository {
+                                repository: repo.name.clone(),
+                                path: dir.path().display().to_string(),
+                            }) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                warning!("Failed to add package {}", lulu.package.name);
+                                eprintln!("{:?}", e);
+                            }
+                        };
+                    }
+                }
+            })
+        }
+
+        success!("Up to date");
     });
 }
