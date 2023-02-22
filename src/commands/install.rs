@@ -18,6 +18,8 @@ use rust_apt::{
 };
 use yansi::{Color, Paint};
 
+use crate::db::Db;
+use crate::model::DbPackage;
 use crate::utils::lulu::lulu_file;
 use crate::{
     error,
@@ -25,7 +27,7 @@ use crate::{
     success, tip, title, warning,
 };
 
-fn install_local(no_install: bool) {
+fn install_local(ctx: Context) {
     let deserialized = match lulu_file("LULU.toml") {
         Ok(f) => f.unwrap(),
         Err(e) => {
@@ -34,10 +36,10 @@ fn install_local(no_install: bool) {
         }
     };
 
-    install_with_ctx(env::current_dir().unwrap(), deserialized, no_install);
+    install_with_ctx(env::current_dir().unwrap(), deserialized, ctx.no_install);
 }
 
-fn install_git(url: String, no_install: bool) {
+fn install_git(url: String, ctx: Context) {
     let path = env::temp_dir().join(format!("lulu_{}", Utc::now().timestamp()));
     let mut builder = DirBuilder::new();
     builder.recursive(true);
@@ -57,7 +59,48 @@ fn install_git(url: String, no_install: bool) {
         }
     };
     env::set_current_dir(path.display().to_string()).unwrap();
-    install_local(no_install);
+    install_local(ctx);
+}
+
+fn install_db(name: String, ctx: Context) {
+    let document = ctx.clone().db.collection("packages").doc(name.as_str());
+    if !document.exist {
+        error!("Package {} not found", name);
+        panic!("Package {} not found", name);
+    }
+
+    let package = match document.get::<DbPackage>() {
+        Ok(p) => match p {
+            None => {
+                error!("Document seems to be empty");
+                panic!("Document seems to be empty");
+            }
+            Some(p) => p,
+        },
+        Err(e) => {
+            error!("Failed to read document");
+            panic!("{:?}", e);
+        }
+    };
+
+    let path = env::temp_dir().join(format!("lulu_{}", Utc::now().timestamp()));
+    let mut builder = DirBuilder::new();
+    builder.recursive(true);
+    builder.create(path.clone().into_os_string()).unwrap();
+
+    match std::fs::copy(
+        Path::new(&package.path).join("LULU.toml"),
+        path.join("LULU.toml"),
+    ) {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to copy LULU.toml");
+            panic!("{:?}", e);
+        }
+    };
+
+    env::set_current_dir(path.display().to_string()).unwrap();
+    install_local(ctx);
 }
 
 fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
@@ -438,19 +481,28 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
 }
 
 pub fn install(name: Option<String>, no_install: bool) {
+    let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+        Ok(db) => db,
+        Err(e) => {
+            error!("Failed to open database");
+            panic!("{:?}", e);
+        }
+    };
+    let ctx = Context { no_install, db };
     match name {
         Some(n) => {
             if n.contains("://") || n.starts_with("git@") {
-                install_git(n, no_install)
+                install_git(n, ctx)
             } else {
-                eprintln!(
-                    "{}{}",
-                    Paint::masked("❌  ").fg(Color::Red),
-                    Paint::red("Unimplemented")
-                );
-                todo!()
+                install_db(n, ctx)
             }
         }
-        None => install_local(no_install),
+        None => install_local(ctx),
     }
+}
+
+#[derive(Clone)]
+struct Context {
+    pub no_install: bool,
+    pub db: Db,
 }
