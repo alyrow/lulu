@@ -21,6 +21,10 @@ fakeroot = { is = "APT" }
 
 [dependencies.build]
 libapt-pkg-dev = { is = "APT" }
+gcc = { is = "APT" }
+pkg-config = { is = "APT" }
+libssl-dev = { is = "APT" }
+"g++" = { is = "APT" }
 
 [dependencies.optional]
 

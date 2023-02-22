@@ -16,6 +16,10 @@ You can find builds of lulu in the [actions tab](https://github.com/alyrow/lulu/
 If you want to build and install yourself lulu, you need to install the following dependencies:
 
 - libapt-pkg-dev
+- gcc
+- pkg-config
+- libssl-dev
+- g++
 
 [Setup a rust environment](https://rustup.rs/)
 
