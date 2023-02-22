@@ -1,3 +1,4 @@
+use std::io::Error;
 use std::{
     env,
     fs::{DirBuilder, File},
@@ -19,7 +20,7 @@ use rust_apt::{
 use yansi::{Color, Paint};
 
 use crate::db::Db;
-use crate::model::DbPackage;
+use crate::model::{DbPackage, Installed};
 use crate::utils::lulu::lulu_file;
 use crate::{
     error,
@@ -36,7 +37,7 @@ fn install_local(ctx: Context) {
         }
     };
 
-    install_with_ctx(env::current_dir().unwrap(), deserialized, ctx.no_install);
+    install_with_ctx(env::current_dir().unwrap(), deserialized, ctx);
 }
 
 fn install_git(url: String, ctx: Context) {
@@ -103,7 +104,7 @@ fn install_db(name: String, ctx: Context) {
     install_local(ctx);
 }
 
-fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
+fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
     let repo = match Repository::open(path.clone()) {
         Ok(repo) => repo,
         Err(_) => {
@@ -344,7 +345,7 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
     }
 
     // Installing built package
-    if !no_install {
+    if !ctx.no_install {
         title!(
             "📦",
             "Installing {}",
@@ -389,6 +390,26 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, no_install: bool) {
             },
             Err(e) => panic!("{:?}", e),
         }
+
+        match ctx
+            .db
+            .collection("installed")
+            .doc(lulu.package.name.as_str())
+            .set(Installed {
+                version,
+                hash: repo
+                    .head()
+                    .expect("There should be at least one commit")
+                    .target()
+                    .expect("The commit should point to a ref")
+                    .to_string(),
+                source: lulu.package.source,
+            }) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("{:?}", e);
+            }
+        };
     }
 
     success!("Done");

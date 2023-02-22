@@ -17,3 +17,10 @@ pub struct DbPackage {
     pub repository: String,
     pub path: String,
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct Installed {
+    pub version: String,
+    pub hash: String,
+    pub source: String,
+}
