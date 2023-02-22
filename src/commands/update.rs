@@ -57,7 +57,8 @@ pub fn update(_no_check: bool) {
         match remote.connect(git2::Direction::Fetch) {
             Ok(_) => {}
             Err(_) => {
-                error!("Failed to connect to repository")
+                error!("Failed to connect to repository");
+                return;
             }
         }
         let remote_oid = match remote.list() {
