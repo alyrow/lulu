@@ -7,6 +7,13 @@ source = "https://github.com/alyrow/lulu.git"
 arch = ["any"]
 license = []
 provides = ["lulu"]
+postinst = '''
+#!/bin/sh
+set -e
+
+lulu setup
+
+'''
 
 [dependencies.runtime]
 fakeroot = { is = "APT" }
@@ -30,5 +37,7 @@ check = '''
 '''
 package = '''
 mkdir -p $pkgdir/usr/bin
+mkdir -p $pkgdir/etc
 install -Dm755 target/release/lulu $pkgdir/usr/bin/lulu
+install -Dm644 lulu.conf $pkgdir/etc/lulu.conf
 '''
