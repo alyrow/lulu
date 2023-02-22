@@ -184,7 +184,7 @@ pub mod git {
 pub mod lulu {
     use crate::package::Lulu;
     use std::io::{Error, Read};
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     pub fn lulu_file<P: AsRef<Path>>(path: P) -> Result<Result<Lulu, toml::de::Error>, Error> {
         let file = std::fs::File::open(path)?;

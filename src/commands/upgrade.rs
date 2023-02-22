@@ -2,7 +2,6 @@ use crate::commands::install;
 use crate::db::Db;
 use crate::model::Installed;
 use crate::{error, tip, title, warning};
-use std::io::Error;
 use std::path::Path;
 use yansi::{Color, Paint};
 

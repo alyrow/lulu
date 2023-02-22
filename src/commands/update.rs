@@ -1,9 +1,9 @@
-use crate::db::{Condition, Db, Where};
+use crate::db::{Condition, Db};
 use crate::model::{Config, DbPackage};
 use crate::utils::lulu::lulu_file;
 use crate::{error, success, tip, title, warning};
 use serde_json::Value;
-use std::io::{Error, Read};
+use std::io::Read;
 use std::path::Path;
 use yansi::{Color, Paint};
 

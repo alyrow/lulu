@@ -1,4 +1,3 @@
-use std::io::Error;
 use std::{
     env,
     fs::{DirBuilder, File},
@@ -6,9 +5,6 @@ use std::{
     process::Command,
 };
 
-use std::io::prelude::*;
-
-use chrono::Utc;
 use deb_rust::{binary::DebPackage, DebArchitecture};
 use fork::{fork, Fork};
 use git2::{DescribeOptions, Repository};

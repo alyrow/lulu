@@ -4,7 +4,7 @@ use serde_json::{Map, Value};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Read, Write};
-use std::path::{Path, PathBuf, StripPrefixError};
+use std::path::PathBuf;
 
 /// Base struct of the database
 ///
@@ -69,37 +69,6 @@ fn value_cmp(v1: &Value, v2: &Value) -> Ordering {
     }
 }
 
-fn value_cond(v1: Value, cond: Condition, v2: Value) -> bool {
-    match cond {
-        Condition::Equal => v1 == v2,
-        Condition::NotEqual => v1 != v2,
-        _ => match v1 {
-            Value::Number(_) => match cond {
-                Condition::Greater => v1.as_f64().unwrap() > v2.as_f64().unwrap(),
-                Condition::Less => v1.as_f64().unwrap() < v2.as_f64().unwrap(),
-                Condition::GreaterOrEqual => v1.as_f64().unwrap() >= v2.as_f64().unwrap(),
-                Condition::LessOrEqual => v1.as_f64().unwrap() <= v2.as_f64().unwrap(),
-                _ => false,
-            },
-            Value::String(_) => match cond {
-                Condition::Greater => v1.as_str().unwrap() > v2.as_str().unwrap(),
-                Condition::Less => v1.as_str().unwrap() < v2.as_str().unwrap(),
-                Condition::GreaterOrEqual => v1.as_str().unwrap() >= v2.as_str().unwrap(),
-                Condition::LessOrEqual => v1.as_str().unwrap() <= v2.as_str().unwrap(),
-                _ => false,
-            },
-            Value::Bool(_) => match cond {
-                Condition::Greater => v1.as_bool().unwrap() > v2.as_bool().unwrap(),
-                Condition::Less => v1.as_bool().unwrap() < v2.as_bool().unwrap(),
-                Condition::GreaterOrEqual => v1.as_bool().unwrap() >= v2.as_bool().unwrap(),
-                Condition::LessOrEqual => v1.as_bool().unwrap() <= v2.as_bool().unwrap(),
-                _ => false,
-            },
-            _ => false,
-        },
-    }
-}
-
 impl Collection {
     pub fn new(db: Db, name: &str) -> Collection {
         let path = db.base.join(name);
@@ -111,6 +80,7 @@ impl Collection {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_from(db: Db, name: &str, base: PathBuf) -> Collection {
         let path = base.join(name);
         Collection {
@@ -300,6 +270,7 @@ impl Document {
         }
     }
 
+    #[allow(dead_code)]
     pub fn update<T: Serialize>(&mut self, data: T) -> Result<(), Error>
     where
         T: DeserializeOwned,
@@ -327,6 +298,7 @@ impl Document {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn collection(self, name: &str) -> Collection {
         let mut path = self.path.clone();
         path.set_extension("");
@@ -340,6 +312,7 @@ pub struct Where {
     result: Vec<IdDocument>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub enum Condition {
     Equal,
@@ -445,6 +418,7 @@ impl Where {
             .collect())
     }
 
+    #[allow(dead_code)]
     pub fn wherr(&mut self, key: String, cond: Condition, value: Value) -> Result<Where, Error> {
         let v = self
             .clone()
