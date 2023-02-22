@@ -180,3 +180,17 @@ pub mod git {
         do_merge(&repo, &remote_branch, fetch_commit)
     }
 }
+
+pub mod lulu {
+    use std::io::{Error, Read};
+    use std::path::{Path, PathBuf};
+    use crate::package::Lulu;
+
+    pub fn lulu_file<P: AsRef<Path>>(path: P) -> Result<Result<Lulu, toml::de::Error>, Error> {
+        let file = std::fs::File::open(path)?;
+        let mut buf_reader = std::io::BufReader::new(file);
+        let mut contents = String::new();
+        buf_reader.read_to_string(&mut contents)?;
+        Ok(toml::from_str(&contents))
+    }
+}

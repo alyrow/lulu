@@ -23,22 +23,20 @@ use crate::{
     package::{DependencyType, Lulu},
     success, tip, title, warning,
 };
+use crate::utils::lulu::lulu_file;
 
 fn install_local(no_install: bool) {
-    let lulu_file = File::open("LULU.toml");
-    match lulu_file {
-        Ok(mut f) => {
-            let mut contents = String::new();
-            f.read_to_string(&mut contents).unwrap();
-            let deserialized: Lulu = toml::from_str(&contents).unwrap();
-            println!("deserialized = {:?}", deserialized);
-            install_with_ctx(env::current_dir().unwrap(), deserialized, no_install);
+    let deserialized = match lulu_file("LULU.toml") {
+        Ok(f) => {
+            f.unwrap()
         }
         Err(e) => {
             error!("LULU.toml is not readable");
             panic!("{:?}", e)
         }
-    }
+    };
+
+    install_with_ctx(env::current_dir().unwrap(), deserialized, no_install);
 }
 
 fn install_git(url: String, no_install: bool) {
