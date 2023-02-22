@@ -1,8 +1,8 @@
 mod install;
+mod remove;
 mod setup;
 mod update;
 mod upgrade;
-mod remove;
 
 pub fn install(name: Option<String>, no_install: bool) {
     install::install(name, no_install)

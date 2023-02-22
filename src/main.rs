@@ -48,8 +48,7 @@ enum Commands {
         no_check: bool,
     },
     /// Upgrade installed packages
-    Upgrade {
-    },
+    Upgrade {},
     /// Remove an installed package
     Remove {
         // Package to uninstall
@@ -83,15 +82,18 @@ fn main() {
         Some(Commands::Update { no_check }) => {
             update(no_check.to_owned());
         }
-        Some(Commands::Upgrade { .. }) => {
-            upgrade()
-        }
+        Some(Commands::Upgrade { .. }) => upgrade(),
         Some(Commands::Remove { name, purge }) => {
             remove(name.to_owned(), purge.to_owned());
         }
         None => {
             let fm = db::Db::new(Path::new("/var/lib/lulu/db").to_path_buf()).unwrap();
-            fm.collection("test").add(Test { name: "alyrow".to_string(), n: 22 }).unwrap();
+            fm.collection("test")
+                .add(Test {
+                    name: "alyrow".to_string(),
+                    n: 22,
+                })
+                .unwrap();
         }
     }
 }
