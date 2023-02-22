@@ -18,6 +18,8 @@ jobs:
           fetch-depth: 0
       - name: Install necessary build dependencies
         run: sudo apt update && sudo apt install -y libapt-pkg-dev
+      - name: Setup
+        run: cargo run --verbose -- setup
       - name: Build
         run: cargo run --verbose -- install -n
       - name: Upload artifact
@@ -34,6 +36,8 @@ jobs:
           fetch-depth: 0
       - name: Install necessary build dependencies
         run: sudo apt update && sudo apt install -y libapt-pkg-dev
+      - name: Setup
+        run: cargo run --verbose -- setup
       - name: Build
         run: cargo run --verbose -- install -n
       - name: Upload artifact
