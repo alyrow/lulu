@@ -2,6 +2,7 @@ mod install;
 mod setup;
 mod update;
 mod upgrade;
+mod remove;
 
 pub fn install(name: Option<String>, no_install: bool) {
     install::install(name, no_install)
@@ -17,4 +18,8 @@ pub fn update(no_check: bool) {
 
 pub fn upgrade() {
     upgrade::upgrade()
+}
+
+pub fn remove(name: String, purge: bool) {
+    remove::remove(name, purge)
 }

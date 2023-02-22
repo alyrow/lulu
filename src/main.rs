@@ -9,7 +9,7 @@ use serde::Serialize;
 use std::path::Path;
 use yansi::Paint;
 
-use crate::commands::{install, setup, update, upgrade};
+use crate::commands::{install, remove, setup, update, upgrade};
 
 /// Concept of package manager built on top of apt for handling git repositories
 #[derive(Parser)]
@@ -50,6 +50,15 @@ enum Commands {
     /// Upgrade installed packages
     Upgrade {
     },
+    /// Remove an installed package
+    Remove {
+        // Package to uninstall
+        name: String,
+
+        /// Purge
+        #[arg(short, long)]
+        purge: bool,
+    },
 }
 
 fn main() {
@@ -76,6 +85,9 @@ fn main() {
         }
         Some(Commands::Upgrade { .. }) => {
             upgrade()
+        }
+        Some(Commands::Remove { name, purge }) => {
+            remove(name.to_owned(), purge.to_owned());
         }
         None => {
             let fm = db::Db::new(Path::new("/var/lib/lulu/db").to_path_buf()).unwrap();
