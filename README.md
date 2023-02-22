@@ -6,7 +6,7 @@ number of dependencies.
 
 A use case: the latest version of [awesomewm](https://github.com/awesomeWM/awesome) (at the time of February 2023) was
 released in January 2019.
-Since that release there are 1588 commits which adds a lot of functionalities.
+Since that release there were 1588 commits which adds a lot of functionalities.
 
 _Note: There are several functionalities which are not implement like handling dependencies with other git repositories, 
 handling ssh, ..._
@@ -26,7 +26,7 @@ git clone https://github.com/alyrow/lulu.git
 cd lulu
 
 cargo run -- setup # Init lulu db
-cargo run --verbose -- install # Build and install lulu
+cargo run -- install # Build and install lulu
 ```
 
 ## Usage
