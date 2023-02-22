@@ -273,6 +273,7 @@ impl Document {
     }
 
     pub fn set_with_index<T: Serialize>(&self, data: T, index: bool) -> Result<(), Error> {
+        self.collection.mkdir()?;
         let serialized = serde_json::to_string(&data).unwrap();
         let mut file = std::fs::File::create(self.path.clone())?;
         file.write_all(serialized.as_ref())?;
