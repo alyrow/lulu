@@ -8,6 +8,7 @@ use std::{
 use deb_rust::{binary::DebPackage, DebArchitecture};
 use fork::{fork, Fork};
 use git2::{DescribeOptions, Repository};
+use log::trace;
 use rust_apt::{
     cache::Cache,
     package::Package as AptPackage,
@@ -144,7 +145,7 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
             .expect("The commit should point to a ref")
             .to_string(),
     };
-    println!("Version is {}", Paint::cyan(version.clone()));
+    trace!("Version is {}", Paint::cyan(version.clone()));
 
     if sudo::check() != sudo::RunningAs::Root {
         sudo::with_env(&["USER", "HOME"]).expect("lulu need root access to install packages");
@@ -225,12 +226,12 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
     let mut status: i32 = 0;
     match fork() {
         Ok(Fork::Parent(child)) => {
-            println!(
+            trace!(
                 "Continuing execution in parent process, new child has pid: {}",
                 child
             );
             unsafe { libc::waitpid(child, &mut status, 0) };
-            println!("Status is {}", status);
+            trace!("Status is {}", status);
         }
         Ok(Fork::Child) => {
             let srcdir = repo.path().parent().unwrap().to_path_buf();

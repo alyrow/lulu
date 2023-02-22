@@ -7,6 +7,7 @@ mod utils;
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 use std::path::Path;
+use log::trace;
 use yansi::Paint;
 
 use crate::commands::{install, remove, setup, update, upgrade};
@@ -18,6 +19,10 @@ struct Cli {
     /// Disable color output
     #[arg(long)]
     no_color: bool,
+
+    /// Enable debug mode
+    #[arg(short, long)]
+    debug: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -61,9 +66,11 @@ enum Commands {
 }
 
 fn main() {
-    simple_logger::init_with_level(log::Level::Trace).unwrap();
-
     let cli = Cli::parse();
+
+    if cli.debug {
+        simple_logger::init_with_level(log::Level::Trace).unwrap();
+    }
 
     if Paint::enable_windows_ascii() && !cli.no_color {
         Paint::enable()
@@ -73,7 +80,7 @@ fn main() {
 
     match &cli.command {
         Some(Commands::Install { name, no_install }) => {
-            println!("{:?}", name);
+            trace!("{:?}", name);
             install(name.to_owned(), no_install.to_owned());
         }
         Some(Commands::Setup { .. }) => {
@@ -87,13 +94,8 @@ fn main() {
             remove(name.to_owned(), purge.to_owned());
         }
         None => {
-            let fm = db::Db::new(Path::new("/var/lib/lulu/db").to_path_buf()).unwrap();
-            fm.collection("test")
-                .add(Test {
-                    name: "alyrow".to_string(),
-                    n: 22,
-                })
-                .unwrap();
+            update(true);
+            upgrade();
         }
     }
 }
