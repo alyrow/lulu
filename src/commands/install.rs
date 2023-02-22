@@ -18,18 +18,16 @@ use rust_apt::{
 };
 use yansi::{Color, Paint};
 
+use crate::utils::lulu::lulu_file;
 use crate::{
     error,
     package::{DependencyType, Lulu},
     success, tip, title, warning,
 };
-use crate::utils::lulu::lulu_file;
 
 fn install_local(no_install: bool) {
     let deserialized = match lulu_file("LULU.toml") {
-        Ok(f) => {
-            f.unwrap()
-        }
+        Ok(f) => f.unwrap(),
         Err(e) => {
             error!("LULU.toml is not readable");
             panic!("{:?}", e)
