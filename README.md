@@ -127,3 +127,81 @@ source = "https://github.com/alyrow/lulu-packages.git"
 `ignore` field is for ignoring package upgrade.
 
 And `repositories` section is for adding lulu repositories which take a **unique** name and a source (git url).
+
+## LULU.toml
+
+Maybe you are interested to package other git repositories, so you need to create a `LULU.toml` file.
+
+The structure of a `LULU.toml` file looks like that:
+
+```toml
+[package]
+name = "lulu-git" # Name of the package, we will prefer to add `-git` suffix to differenciate with the package provided by apt
+maintainers = ["alyrow"] # Mainteners name
+description = "Concept of package manager built on top of apt for handling git repositories" # A description of the programm you package
+url = "https://github.com/alyrow/lulu" # [Optionnal] Url to the programm website
+source = "https://github.com/alyrow/lulu.git" # Git url of the source repository
+arch = ["any"] # Architecture supported (Not used actually)
+license = [] # License of the programm
+provides = ["lulu"] # What programm(s) provide the package
+preinst = "" # [Optionnal] A script run before installation of the package
+# [Optionnal] A script run after installation of the package
+postinst = ''' 
+#!/bin/sh
+set -e
+
+lulu setup
+'''
+prerm = "" # [Optionnal] A script run before removal of the package
+postrm = "" # [Optionnal] A script run after removal of the package
+
+# Dependencies section (note: git dependencies are not implemented!)
+
+# Dependencies needed by your programm
+[dependencies.runtime]
+fakeroot = { is = "APT" }
+"libapt-pkg6.0" = { is = "APT" }
+
+# Dependencies needed to build your programm
+[dependencies.build]
+libapt-pkg-dev = { is = "APT" }
+gcc = { is = "APT" }
+pkg-config = { is = "APT" }
+libssl-dev = { is = "APT" }
+"g++" = { is = "APT" }
+
+# Optional dependencies needed by your programm
+[dependencies.optional]
+
+[script]
+# Prepare script usually used to move files before building
+prepare = '''
+'''
+# Build script run for building your programm
+build = '''
+export PATH=$PATH:$HOME/.cargo/bin/
+cargo update
+cargo build --release
+'''
+# Check script run for running test for example
+check = '''
+
+'''
+# Package script which is run with fakeroot for installing your programm in $pkgdir folder in order to package it
+package = '''
+mkdir -p $pkgdir/usr/bin
+mkdir -p $pkgdir/etc
+install -Dm755 target/release/lulu $pkgdir/usr/bin/lulu
+install -Dm644 lulu.conf $pkgdir/etc/lulu.conf
+'''
+```
+
+Note: The following shell variables are available in scripts:
+
+- `$srcdir`: Source files
+- `$basedir`: Where your `LULU.toml` file is
+- `$pkgdir`: Dir where you will put your files to be packaged
+
+Some useful references:
+
+- https://wiki.archlinux.org/title/Creating_packages#PKGBUILD_functions
