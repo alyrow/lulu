@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf, StripPrefixError};
 use serde::Serialize;
@@ -64,6 +65,39 @@ fn value_cmp(v1: &Value, v2: &Value) -> Ordering {
     }
 }
 
+fn value_cond(v1: Value, cond: Condition, v2: Value) -> bool {
+    match cond {
+        Condition::Equal => v1 == v2,
+        Condition::NotEqual => v1 != v2,
+        _ => {
+            match v1 {
+                Value::Number(_) => match cond {
+                    Condition::Greater => v1.as_f64().unwrap() > v2.as_f64().unwrap(),
+                    Condition::Less => v1.as_f64().unwrap() < v2.as_f64().unwrap(),
+                    Condition::GreaterOrEqual => v1.as_f64().unwrap() >= v2.as_f64().unwrap(),
+                    Condition::LessOrEqual => v1.as_f64().unwrap() <= v2.as_f64().unwrap(),
+                    _ => false
+                },
+                Value::String(_) => match cond {
+                    Condition::Greater => v1.as_str().unwrap() > v2.as_str().unwrap(),
+                    Condition::Less => v1.as_str().unwrap() < v2.as_str().unwrap(),
+                    Condition::GreaterOrEqual => v1.as_str().unwrap() >= v2.as_str().unwrap(),
+                    Condition::LessOrEqual => v1.as_str().unwrap() <= v2.as_str().unwrap(),
+                    _ => false
+                },
+                Value::Bool(_) => match cond {
+                    Condition::Greater => v1.as_bool().unwrap() > v2.as_bool().unwrap(),
+                    Condition::Less => v1.as_bool().unwrap() < v2.as_bool().unwrap(),
+                    Condition::GreaterOrEqual => v1.as_bool().unwrap() >= v2.as_bool().unwrap(),
+                    Condition::LessOrEqual => v1.as_bool().unwrap() <= v2.as_bool().unwrap(),
+                    _ => false
+                }
+                _ => false
+            }
+        }
+    }
+}
+
 impl Collection {
     pub fn new(db: Db, name: &str) -> Collection {
         let path = db.base.join(name);
@@ -96,7 +130,9 @@ impl Collection {
         Ok(id)
     }
 
-    // TODO pub fn where
+    pub fn wherr(self, key: String, cond: Condition, value: Value) -> Result<Where, Error> {
+        Where::new(self, key, cond, value)
+    }
 
     pub fn get(&self) -> Vec<IdDocument> {
         if !self.exist {
@@ -179,6 +215,7 @@ impl Collection {
     }
 }
 
+#[derive(Clone)]
 pub struct IdDocument {
     pub id: String,
     pub doc: Document,
@@ -266,5 +303,152 @@ impl Document {
         let mut path = self.path.clone();
         path.set_extension("");
         Collection::new_from(self.collection.db, name, path)
+    }
+}
+
+#[derive(Clone)]
+pub struct Where {
+    collection: Collection,
+    result: Vec<IdDocument>,
+}
+
+#[derive(Clone)]
+pub enum Condition { Equal, NotEqual, Greater, Less, GreaterOrEqual, LessOrEqual }
+
+impl Where {
+    pub fn new(collection: Collection, key: String, cond: Condition, value: Value) -> Result<Where, Error> {
+        let w = Where { collection: collection.copy(), result: Vec::new() };
+        let result = w.search(key, cond, value)?;
+        Ok(Where { collection, result })
+    }
+
+    fn search(self, key: String, cond: Condition, value: Value) -> Result<Vec<IdDocument>, Error> {
+        if !self.collection.exist {
+            return Ok(vec![]);
+        }
+        let relative_path = match self.collection.path.strip_prefix(self.collection.db.base.clone()) {
+            Ok(p) => Ok(p),
+            Err(e) => Err(Error::new(ErrorKind::Other, e))
+        }?;
+        let file = std::fs::File::open(self.collection.db.base.join("index.json"))?;
+        let mut buf_reader = std::io::BufReader::new(file);
+        let mut contents = String::new();
+        buf_reader.read_to_string(&mut contents)?;
+        let index = serde_json::from_str::<Map<String, Value>>(contents.as_str())?.get(relative_path.display().to_string().as_str()).map_or(Map::<String, Value>::new(), |v| v.as_object().unwrap_or(&Map::<String, Value>::new()).to_owned());
+
+        if !index.contains_key(key.as_str()) {
+            return Ok(vec![]);
+        }
+
+        let sorted: Vec<_> = index.get(key.as_str()).unwrap().as_array().unwrap().iter().map(|v| (v.as_array().unwrap().get(0).unwrap(), v.as_array().unwrap().get(1).unwrap().as_str().unwrap())).collect();
+        // sorted
+
+        let mut result: Vec<(&Value, &str)>;
+
+        match cond {
+            Condition::NotEqual => {
+                let r = Where::get_equal(sorted.clone(), value);
+                let itv = r.0..r.0 + r.1;
+                result = Vec::<(&Value, &str)>::with_capacity(sorted.len() - r.1);
+                for i in 0..sorted.len() {
+                    if !itv.contains(&i) {
+                        result.push(sorted[i]);
+                    }
+                }
+            }
+            _ => {
+                let r = match cond {
+                    Condition::Equal => Where::get_equal(sorted.clone(), value),
+                    Condition::Less => Where::get_greater(sorted.clone(), value, true, None),
+                    Condition::Greater => Where::get_less(sorted.clone(), value, true),
+                    Condition::LessOrEqual => Where::get_greater(sorted.clone(), value, false, None),
+                    Condition::GreaterOrEqual => Where::get_less(sorted.clone(), value, false),
+                    _ => (0, 0)
+                };
+                result = Vec::<(&Value, &str)>::with_capacity(r.1);
+                for i in 0..r.1 {
+                    result.insert(i, sorted[r.0 + i]);
+                }
+            }
+        }
+
+        Ok(result.iter().map(|e| IdDocument::new(e.1.to_string(), Document::new(e.1, self.collection.copy()))).collect())
+    }
+
+    pub fn wherr(&mut self, key: String, cond: Condition, value: Value) -> Result<Where, Error> {
+        let v = self.clone().search(key, cond, value)?.iter().map(|e| e.id.clone()).collect::<HashSet<String>>();
+        self.result = self.result.iter().map(|e| e.id.clone()).collect::<HashSet<String>>().intersection(&v).map(|e| IdDocument::new(e.to_owned(), Document::new(e.as_str(), self.collection.copy()))).collect();
+
+        Ok(self.clone())
+    }
+
+    pub fn get(self) -> Vec<IdDocument> {
+        self.result
+    }
+
+    fn get_greater(v: Vec<(&Value, &str)>, val: Value, strict: bool, bounds: Option<(usize, usize)>) -> (usize, usize) {
+        let mut bounds = bounds.unwrap_or((0, v.len() - 1));
+        if bounds.0 >= bounds.1 {
+            if value_cmp(v[bounds.1].0, &val) == Ordering::Less || (!strict && value_cmp(v[bounds.1].0, &val) == Ordering::Equal) { (0, bounds.1 + 1) } else { (0, 0) }
+        } else {
+            if value_cmp(v[(bounds.0 + bounds.1 + 1) / 2].0, &val) == Ordering::Less || (!strict && value_cmp(v[(bounds.0 + bounds.1 + 1) / 2].0, &val) == Ordering::Equal) {
+                bounds.0 = (bounds.0 + bounds.1 + 1) / 2;
+                Where::get_greater(v, val, strict, Some(bounds))
+            } else {
+                bounds.1 = (bounds.0 + bounds.1) / 2;
+                Where::get_greater(v, val, strict, Some(bounds))
+            }
+        }
+    }
+
+    fn get_less(v: Vec<(&Value, &str)>, val: Value, strict: bool) -> (usize, usize) {
+        let g = Where::get_greater(v.clone(), val, !strict, None).1;
+        (g, v.len() - g)
+    }
+
+    fn get_equal(v: Vec<(&Value, &str)>, val: Value) -> (usize, usize) {
+        let less = Where::get_less(v.clone(), val.clone(), false);
+        let greater = Where::get_greater(v.clone(), val, false, None);
+
+        (less.0, greater.1 - less.0)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_get_greater() {
+        let mut v = Vec::new();
+        let u = (&Value::from(1), "a");
+        v.push(u);
+        let u = (&Value::from(2), "b");
+        v.push(u);
+        let u = (&Value::from(3), "c");
+        v.push(u);
+        let u = (&Value::from(3), "d");
+        v.push(u);
+        let u = (&Value::from(3), "e");
+        v.push(u);
+        let u = (&Value::from(4), "f");
+        v.push(u);
+        let u = (&Value::from(7), "g");
+        v.push(u);
+        let u = (&Value::from(8), "h");
+        v.push(u);
+        let u = (&Value::from(9), "i");
+        v.push(u);
+        let u = (&Value::from(9), "j");
+        v.push(u);
+
+        let bounds = Where::get_greater(v.clone(), Value::from(3), false, None);
+        println!("{:?}", bounds);
+
+        let bounds = Where::get_less(v.clone(), Value::from(3), false);
+        println!("{:?}", bounds);
+
+        let bounds = Where::get_equal(v, Value::from(3));
+        println!("{:?}", bounds);
     }
 }
