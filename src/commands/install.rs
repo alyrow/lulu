@@ -431,20 +431,22 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
 }
 
 fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
+    let bash_command  = |script: String| Command::new("bash")
+        .env("basedir", basedir.display().to_string())
+        .env("srcdir", srcdir.display().to_string())
+        .env("pkgdir", pkgdir.display().to_string())
+        .arg("-ec")
+        .arg(script)
+        .spawn()
+        .expect("Failed to execute command")
+        .wait()
+        .unwrap()
+        .success();
+
     // Prepare
     title!("🔧", "Preparing");
     if lulu.script.prepare.is_some() {
-        if !Command::new("bash")
-            .env("basedir", basedir.display().to_string())
-            .env("srcdir", srcdir.display().to_string())
-            .env("pkgdir", pkgdir.display().to_string())
-            .arg("-ec")
-            .arg(lulu.script.prepare.unwrap())
-            .spawn()
-            .expect("Failed to execute command")
-            .wait()
-            .unwrap()
-            .success()
+        if !bash_command(lulu.script.prepare.unwrap())
         {
             error!("Prepare failed");
             std::process::exit(1);
@@ -455,17 +457,7 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
     title!("🔨", "Building");
     env::set_current_dir(srcdir.display().to_string()).unwrap();
     if lulu.script.build.is_some() {
-        if !Command::new("bash")
-            .env("basedir", basedir.display().to_string())
-            .env("srcdir", srcdir.display().to_string())
-            .env("pkgdir", pkgdir.display().to_string())
-            .arg("-ec")
-            .arg(lulu.script.build.unwrap())
-            .spawn()
-            .expect("Failed to execute command")
-            .wait()
-            .unwrap()
-            .success()
+        if !bash_command(lulu.script.build.unwrap())
         {
             error!("Build failed");
             std::process::exit(1);
@@ -475,17 +467,7 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
     // Test
     title!("🪃", "Testing");
     if lulu.script.check.is_some() {
-        if !Command::new("bash")
-            .env("basedir", basedir.display().to_string())
-            .env("srcdir", srcdir.display().to_string())
-            .env("pkgdir", pkgdir.display().to_string())
-            .arg("-ec")
-            .arg(lulu.script.check.unwrap())
-            .spawn()
-            .expect("Failed to execute command")
-            .wait()
-            .unwrap()
-            .success()
+        if !bash_command(lulu.script.check.unwrap())
         {
             error!("Test failed");
             std::process::exit(1);
