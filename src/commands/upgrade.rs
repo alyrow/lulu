@@ -1,6 +1,7 @@
+use std::io::Read;
 use crate::commands::install;
 use crate::db::Db;
-use crate::model::Installed;
+use crate::model::{Config, Installed};
 use crate::{error, tip, title, warning};
 use std::path::Path;
 use yansi::{Color, Paint};
@@ -24,10 +25,34 @@ pub fn upgrade() {
             panic!("{:?}", e);
         }
     };
+
+    let file = match std::fs::File::open(Path::new("/etc/lulu.conf")) {
+        Ok(f) => f,
+        Err(e) => {
+            error!("Error while opening /etc/lulu.conf");
+            panic!("{:?}", e);
+        }
+    };
+    let mut buf_reader = std::io::BufReader::new(file);
+    let mut contents = String::new();
+    match buf_reader.read_to_string(&mut contents) {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to read /etc/lulu.conf");
+            panic!("{:?}", e);
+        }
+    }
+    let config: Config = toml::from_str(&contents).unwrap();
+
     title!("🧨", "Checking for upgrades");
     db.clone().collection("installed").get().iter().for_each(|p| {
         if !db.clone().collection("packages").doc(p.id.as_str()).exist {
             warning!("Skipping {} as it is not in a repository so we don't know what to do if there are updates available", p.id);
+            return;
+        }
+
+        if config.ignore.contains(&p.id) {
+            warning!("Skipping {} as it is in ignore section", p.id);
             return;
         }
 
