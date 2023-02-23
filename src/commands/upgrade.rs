@@ -105,9 +105,8 @@ pub fn upgrade() {
 
     match db.unlock() {
         Ok(_) => {}
-        Err(e) => {
-            error!("Failed to unlock database");
-            panic!("{:?}", e);
+        Err(_) => {
+            warning!("Database already unlocked");
         }
     };
 }
