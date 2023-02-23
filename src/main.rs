@@ -6,7 +6,6 @@ mod utils;
 
 use clap::{Parser, Subcommand};
 use serde::Serialize;
-use std::path::Path;
 use log::trace;
 use yansi::Paint;
 

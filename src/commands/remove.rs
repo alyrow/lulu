@@ -1,9 +1,8 @@
-use crate::db::Db;
 use crate::{error, tip, title, warning};
 use rust_apt::cache::Cache;
 use rust_apt::raw::progress::{AptAcquireProgress, AptInstallProgress};
-use std::path::Path;
 use yansi::{Color, Paint};
+use crate::utils::db::open_and_lock_db;
 
 pub fn remove(name: String, purge: bool) {
     if sudo::check() != sudo::RunningAs::Root {
@@ -17,15 +16,14 @@ pub fn remove(name: String, purge: bool) {
             }
         }
     }
-    let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+    let mut db = match open_and_lock_db() {
         Ok(db) => db,
         Err(e) => {
-            error!("Failed to open database");
             panic!("{:?}", e);
         }
     };
 
-    let mut document = db.collection("installed").doc(name.as_str());
+    let mut document = db.clone().collection("installed").doc(name.as_str());
 
     if !document.exist {
         error!("Package {} not installed with lulu", name);
@@ -57,6 +55,14 @@ pub fn remove(name: String, purge: bool) {
         },
         Err(_) => {
             error!("Failed to uninstall {}", name);
+        }
+    };
+
+    match db.unlock() {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to unlock database");
+            panic!("{:?}", e);
         }
     };
 }

@@ -1,10 +1,10 @@
 use std::io::Read;
 use crate::commands::install;
-use crate::db::Db;
 use crate::model::{Config, Installed};
 use crate::{error, tip, title, warning};
 use std::path::Path;
 use yansi::{Color, Paint};
+use crate::utils::db::open_and_lock_db;
 
 pub fn upgrade() {
     if sudo::check() != sudo::RunningAs::Root {
@@ -18,10 +18,9 @@ pub fn upgrade() {
             }
         }
     }
-    let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+    let mut db = match open_and_lock_db() {
         Ok(db) => db,
         Err(e) => {
-            error!("Failed to open database");
             panic!("{:?}", e);
         }
     };
@@ -103,4 +102,12 @@ pub fn upgrade() {
         title!("⚙" ,"Upgrading {}", p.id);
         install(Some(p.clone().id), false);
     });
+
+    match db.unlock() {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to unlock database");
+            panic!("{:?}", e);
+        }
+    };
 }

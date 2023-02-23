@@ -194,3 +194,37 @@ pub mod lulu {
         Ok(toml::from_str(&contents))
     }
 }
+
+pub mod db {
+    use std::io::Error;
+    use std::path::Path;
+    use crate::db::Db;
+    use crate::error;
+    use yansi::{Color, Paint};
+
+    pub fn open_db() -> Result<Db, Error> {
+        let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+            Ok(db) => db,
+            Err(e) => {
+                error!("Failed to open database");
+                return Err(e)
+            }
+        };
+
+        Ok(db)
+    }
+    
+    pub fn open_and_lock_db() -> Result<Db, Error> {
+        let mut db = open_db()?;
+
+        match db.lock() {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to lock database");
+                return Err(e)
+            }
+        };
+
+        Ok(db)
+    }
+}

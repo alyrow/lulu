@@ -24,8 +24,9 @@ use crate::{
     package::{DependencyType, Lulu},
     success, tip, title, warning,
 };
+use crate::utils::db::open_db;
 
-fn install_local(ctx: Context) {
+fn install_local(ctx: &mut Context) {
     let deserialized = match lulu_file("LULU.toml") {
         Ok(f) => f.unwrap(),
         Err(e) => {
@@ -37,7 +38,7 @@ fn install_local(ctx: Context) {
     install_with_ctx(env::current_dir().unwrap(), deserialized, ctx);
 }
 
-fn install_git(url: String, ctx: Context) {
+fn install_git(url: String, ctx: &mut Context) {
     let path = env::temp_dir().join(format!("lulu_{}", url.replace(":", "_").replace("/", "_")));
     let mut builder = DirBuilder::new();
     builder.recursive(true);
@@ -60,7 +61,7 @@ fn install_git(url: String, ctx: Context) {
     install_local(ctx);
 }
 
-fn install_db(name: String, ctx: Context) {
+fn install_db(name: String, ctx: &mut Context) {
     let document = ctx.clone().db.collection("packages").doc(name.as_str());
     if !document.exist {
         error!("Package {} not found", name);
@@ -101,7 +102,7 @@ fn install_db(name: String, ctx: Context) {
     install_local(ctx);
 }
 
-fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
+fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
     let repo = match Repository::open(path.clone()) {
         Ok(repo) => repo,
         Err(_) => {
@@ -342,6 +343,14 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
     }
 
     // Installing built package
+    match ctx.db.lock() {
+        Ok(_) => {}
+        Err(_) => {
+            error!("Failed to lock database");
+            panic!("Failed to lock database");
+        }
+    }
+
     if !ctx.no_install {
         title!(
             "📦",
@@ -390,6 +399,7 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
 
         match ctx
             .db
+            .clone()
             .collection("installed")
             .doc(lulu.package.name.as_str())
             .set(Installed {
@@ -408,6 +418,14 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: Context) {
             }
         };
     }
+
+    match ctx.db.unlock() {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to unlock database");
+            panic!("{:?}", e);
+        }
+    };
 
     success!("Done");
 }
@@ -499,23 +517,23 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
 }
 
 pub fn install(name: Option<String>, no_install: bool) {
-    let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+    let db = match open_db() {
         Ok(db) => db,
         Err(e) => {
-            error!("Failed to open database");
             panic!("{:?}", e);
         }
     };
-    let ctx = Context { no_install, db };
+
+    let mut ctx = Context { no_install, db: db.clone()};
     match name {
         Some(n) => {
             if n.contains("://") || n.starts_with("git@") {
-                install_git(n, ctx)
+                install_git(n, &mut ctx)
             } else {
-                install_db(n, ctx)
+                install_db(n, &mut ctx)
             }
         }
-        None => install_local(ctx),
+        None => install_local(&mut ctx),
     }
 }
 

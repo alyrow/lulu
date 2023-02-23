@@ -1,4 +1,4 @@
-use crate::db::{Condition, Db};
+use crate::db::Condition;
 use crate::model::{Config, DbPackage};
 use crate::utils::lulu::lulu_file;
 use crate::{error, success, tip, title, warning};
@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::io::Read;
 use std::path::Path;
 use yansi::{Color, Paint};
+use crate::utils::db::open_and_lock_db;
 
 pub fn update(_no_check: bool) {
     if sudo::check() != sudo::RunningAs::Root {
@@ -19,13 +20,13 @@ pub fn update(_no_check: bool) {
             }
         }
     }
-    let db = match Db::new(Path::new("/var/lib/lulu/db").to_path_buf()) {
+    let mut db = match open_and_lock_db() {
         Ok(db) => db,
         Err(e) => {
-            error!("Failed to open database");
             panic!("{:?}", e);
         }
     };
+
     title!("📁", "Getting repositories from config");
     let file = match std::fs::File::open(Path::new("/etc/lulu.conf")) {
         Ok(f) => f,
@@ -187,4 +188,12 @@ pub fn update(_no_check: bool) {
 
         success!("Up to date");
     });
+
+    match db.unlock() {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to unlock database");
+            panic!("{:?}", e);
+        }
+    };
 }

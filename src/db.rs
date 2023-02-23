@@ -1,3 +1,5 @@
+use crate::warning;
+use libc::{getpid, kill};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -5,6 +7,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::path::PathBuf;
+use yansi::{Color, Paint};
 
 /// Base struct of the database
 ///
@@ -14,6 +17,8 @@ use std::path::PathBuf;
 #[derive(Clone)]
 pub struct Db {
     base: PathBuf,
+    lock: bool,
+    pid: String,
 }
 
 impl Db {
@@ -25,11 +30,69 @@ impl Db {
             let mut file = std::fs::File::create(base.join("version"))?;
             file.write_all(b"1")?;
         }
-        Ok(Db { base })
+        let lock = match std::fs::File::open(base.join("lock")) {
+            Ok(mut file) => {
+                let mut pid = String::new();
+                file.read_to_string(&mut pid)?;
+                let mpid = unsafe { getpid() };
+                if mpid.to_string() == pid {
+                    true
+                } else {
+                    false
+                }
+            }
+            Err(_) => false,
+        };
+        Ok(Db {
+            base,
+            lock,
+            pid: unsafe { getpid() }.to_string(),
+        })
     }
 
     pub fn collection(self, name: &str) -> Collection {
         Collection::new(self, name)
+    }
+
+    pub fn lock(&mut self) -> Result<(), Error> {
+        if !self.lock {
+            match std::fs::File::open(self.base.join("lock")) {
+                Ok(mut file) => {
+                    let mut pid = String::new();
+                    file.read_to_string(&mut pid)?;
+                    let mpid = unsafe { getpid() };
+                    if mpid.to_string() == pid {
+                        self.lock = true;
+                    } else {
+                        if unsafe { kill(pid.parse().unwrap(), 0) } == 0 {
+                            return Err(Error::new(
+                                ErrorKind::Other,
+                                format!("Another process is locking the db (pid = {})", pid),
+                            ));
+                        } else {
+                            warning!("Seems that a dead process forgot to unlock the db");
+                            std::fs::File::create(self.base.join("lock"))?.write_all(self.pid.as_ref())?;
+                            self.lock = true;
+                        }
+                    }
+                }
+                Err(_) => {
+                    std::fs::File::create(self.base.join("lock"))?.write_all(self.pid.as_ref())?;
+                    self.lock = true;
+                }
+            };
+        }
+
+        Ok(())
+    }
+
+    pub fn unlock(&mut self) -> Result<(), Error> {
+        if self.lock {
+            std::fs::remove_file(self.base.join("lock"))?;
+            self.lock = false;
+        }
+
+        Ok(())
     }
 }
 
@@ -95,6 +158,7 @@ impl Collection {
         Document::new(name, self)
     }
 
+    #[allow(dead_code)]
     pub fn add<T: Serialize>(&self, data: T) -> Result<String, Error> {
         self.mkdir()?;
         let id = uuid::Uuid::new_v4().to_string();
@@ -130,12 +194,18 @@ impl Collection {
 
     fn mkdir(&self) -> Result<(), Error> {
         if !self.exist {
+            if !self.db.lock {
+                return Err(Error::new(ErrorKind::Other, "You should lock the db"));
+            }
             std::fs::create_dir_all(self.path.clone())?;
         }
         Ok(())
     }
 
     pub fn index<T: Serialize>(&self, data: T) -> Result<(), Error> {
+        if !self.db.lock {
+            return Err(Error::new(ErrorKind::Other, "You should lock the db"));
+        }
         let relative_path = match self.path.strip_prefix(self.db.base.clone()) {
             Ok(p) => Ok(p),
             Err(e) => Err(Error::new(ErrorKind::Other, e)),
@@ -243,6 +313,9 @@ impl Document {
     }
 
     pub fn set_with_index<T: Serialize>(&self, data: T, index: bool) -> Result<(), Error> {
+        if !self.collection.db.lock {
+            return Err(Error::new(ErrorKind::Other, "You should lock the db"));
+        }
         self.collection.mkdir()?;
         let serialized = serde_json::to_string(&data).unwrap();
         let mut file = std::fs::File::create(self.path.clone())?;
@@ -289,6 +362,9 @@ impl Document {
     }
 
     pub fn delete(&mut self) -> Result<(), Error> {
+        if !self.collection.db.lock {
+            return Err(Error::new(ErrorKind::Other, "You should lock the db"));
+        }
         let data = self.clone().get::<Map<String, Value>>()?;
         std::fs::remove_file(self.path.clone())?;
         self.exist = false;
