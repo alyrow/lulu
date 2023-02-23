@@ -1,6 +1,6 @@
 [package]
 name = "lulu"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 authors = ["alyrow"]
 
