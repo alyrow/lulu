@@ -11,7 +11,7 @@ use yansi::{Color, Paint};
 pub fn update(_no_check: bool) {
     if sudo::check() != sudo::RunningAs::Root {
         warning!("Lulu must be run as root");
-        match sudo::escalate_if_needed() {
+        match sudo::with_env(&["USER", "HOME"]) {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to run as root");
