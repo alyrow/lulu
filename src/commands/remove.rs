@@ -1,8 +1,8 @@
+use crate::utils::db::open_and_lock_db;
 use crate::{error, tip, title, warning};
 use rust_apt::cache::Cache;
 use rust_apt::raw::progress::{AptAcquireProgress, AptInstallProgress};
 use yansi::{Color, Paint};
-use crate::utils::db::open_and_lock_db;
 
 pub fn remove(name: String, purge: bool) {
     if sudo::check() != sudo::RunningAs::Root {

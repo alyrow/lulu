@@ -1,12 +1,12 @@
 use crate::db::Condition;
 use crate::model::{Config, DbPackage};
+use crate::utils::db::open_and_lock_db;
 use crate::utils::lulu::lulu_file;
 use crate::{error, success, tip, title, warning};
 use serde_json::Value;
 use std::io::Read;
 use std::path::Path;
 use yansi::{Color, Paint};
-use crate::utils::db::open_and_lock_db;
 
 pub fn update(_no_check: bool) {
     if sudo::check() != sudo::RunningAs::Root {

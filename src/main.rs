@@ -5,8 +5,8 @@ mod package;
 mod utils;
 
 use clap::{Parser, Subcommand};
-use serde::Serialize;
 use log::trace;
+use serde::Serialize;
 use yansi::Paint;
 
 use crate::commands::{install, remove, setup, update, upgrade};

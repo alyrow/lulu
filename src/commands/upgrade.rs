@@ -1,10 +1,10 @@
-use std::io::Read;
 use crate::commands::install;
 use crate::model::{Config, Installed};
+use crate::utils::db::open_and_lock_db;
 use crate::{error, tip, title, warning};
+use std::io::Read;
 use std::path::Path;
 use yansi::{Color, Paint};
-use crate::utils::db::open_and_lock_db;
 
 pub fn upgrade() {
     if sudo::check() != sudo::RunningAs::Root {

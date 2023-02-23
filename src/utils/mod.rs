@@ -196,10 +196,10 @@ pub mod lulu {
 }
 
 pub mod db {
-    use std::io::Error;
-    use std::path::Path;
     use crate::db::Db;
     use crate::error;
+    use std::io::Error;
+    use std::path::Path;
     use yansi::{Color, Paint};
 
     pub fn open_db() -> Result<Db, Error> {
@@ -207,13 +207,13 @@ pub mod db {
             Ok(db) => db,
             Err(e) => {
                 error!("Failed to open database");
-                return Err(e)
+                return Err(e);
             }
         };
 
         Ok(db)
     }
-    
+
     pub fn open_and_lock_db() -> Result<Db, Error> {
         let mut db = open_db()?;
 
@@ -221,7 +221,7 @@ pub mod db {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to lock database");
-                return Err(e)
+                return Err(e);
             }
         };
 

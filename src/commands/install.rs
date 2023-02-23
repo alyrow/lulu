@@ -18,13 +18,13 @@ use yansi::{Color, Paint};
 
 use crate::db::Db;
 use crate::model::{DbPackage, Installed};
+use crate::utils::db::open_db;
 use crate::utils::lulu::lulu_file;
 use crate::{
     error,
     package::{DependencyType, Lulu},
     success, tip, title, warning,
 };
-use crate::utils::db::open_db;
 
 fn install_local(ctx: &mut Context) {
     let deserialized = match lulu_file("LULU.toml") {
@@ -524,7 +524,10 @@ pub fn install(name: Option<String>, no_install: bool) {
         }
     };
 
-    let mut ctx = Context { no_install, db: db.clone()};
+    let mut ctx = Context {
+        no_install,
+        db: db.clone(),
+    };
     match name {
         Some(n) => {
             if n.contains("://") || n.starts_with("git@") {

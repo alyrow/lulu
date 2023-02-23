@@ -71,7 +71,8 @@ impl Db {
                             ));
                         } else {
                             warning!("Seems that a dead process forgot to unlock the db");
-                            std::fs::File::create(self.base.join("lock"))?.write_all(self.pid.as_ref())?;
+                            std::fs::File::create(self.base.join("lock"))?
+                                .write_all(self.pid.as_ref())?;
                             self.lock = true;
                         }
                     }
