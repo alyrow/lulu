@@ -6,7 +6,6 @@ use std::{
 };
 
 use deb_rust::{binary::DebPackage, DebArchitecture};
-use fork::{fork, Fork};
 use git2::{DescribeOptions, Repository};
 use log::trace;
 use rust_apt::{
@@ -19,7 +18,7 @@ use yansi::{Color, Paint};
 use crate::db::Db;
 use crate::model::{DbPackage, Installed};
 use crate::utils::db::open_db;
-use crate::utils::lulu::lulu_file;
+use crate::utils::lulu::{fork_wait, lulu_file};
 use crate::{
     error,
     package::{DependencyType, Lulu},
@@ -50,13 +49,21 @@ fn install_git(url: String, ctx: &mut Context) {
         Paint::cyan(path.clone().display()).underline()
     );
 
-    let _repo = match Repository::clone(&url, path.clone()) {
-        Ok(repo) => repo,
-        Err(e) => {
-            error!("Failed to clone repository");
-            panic!("{:?}", e)
-        }
-    };
+    let status = fork_wait(|| {
+        let _repo = match Repository::clone(&url, path.clone()) {
+            Ok(repo) => repo,
+            Err(e) => {
+                error!("Failed to clone repository");
+                panic!("{:?}", e)
+            }
+        };
+    });
+
+    if status != 0 {
+        error!("Something went wrong");
+        return;
+    }
+
     env::set_current_dir(path.display().to_string()).unwrap();
     install_local(ctx);
 }
@@ -83,20 +90,28 @@ fn install_db(name: String, ctx: &mut Context) {
     };
 
     let path = env::temp_dir().join(format!("lulu_{}", name));
-    let mut builder = DirBuilder::new();
-    builder.recursive(true);
-    builder.create(path.clone().into_os_string()).unwrap();
 
-    match std::fs::copy(
-        Path::new(&package.path).join("LULU.toml"),
-        path.join("LULU.toml"),
-    ) {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to copy LULU.toml");
-            panic!("{:?}", e);
-        }
-    };
+    let status = fork_wait(|| {
+        let mut builder = DirBuilder::new();
+        builder.recursive(true);
+        builder.create(path.clone().into_os_string()).unwrap();
+
+        match std::fs::copy(
+            Path::new(&package.path).join("LULU.toml"),
+            path.join("LULU.toml"),
+        ) {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to copy LULU.toml");
+                panic!("{:?}", e);
+            }
+        };
+    });
+
+    if status != 0 {
+        error!("Something went wrong");
+        return;
+    }
 
     env::set_current_dir(path.display().to_string()).unwrap();
     install_local(ctx);
@@ -118,10 +133,24 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
                         "Cloning source repository into {}",
                         Paint::cyan(path2.clone().display()).underline()
                     );
-                    match Repository::clone(&lulu.package.source, path2) {
+                    let status = fork_wait(|| {
+                        match Repository::clone(&lulu.package.source, path2.clone()) {
+                            Ok(repo) => repo,
+                            Err(e) => {
+                                error!("Failed to clone repository");
+                                panic!("{:?}", e)
+                            }
+                        };
+                    });
+
+                    if status != 0 {
+                        error!("Something went wrong");
+                        panic!("Something went wrong");
+                    }
+
+                    match Repository::open(path2) {
                         Ok(repo) => repo,
                         Err(e) => {
-                            error!("Failed to clone repository");
                             panic!("{:?}", e)
                         }
                     }
@@ -224,93 +253,71 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
 
     // BUILD
 
-    let mut status: i32 = 0;
-    match fork() {
-        Ok(Fork::Parent(child)) => {
-            trace!(
-                "Continuing execution in parent process, new child has pid: {}",
-                child
-            );
-            unsafe { libc::waitpid(child, &mut status, 0) };
-            trace!("Status is {}", status);
+    let status = fork_wait(|| {
+        let srcdir = repo.path().parent().unwrap().to_path_buf();
+
+        let pkgdir = path.join("LULU");
+        let mut builder = DirBuilder::new();
+        builder.recursive(true);
+        builder.create(pkgdir.clone().into_os_string()).unwrap();
+
+        generate(lulu.clone(), path.clone(), srcdir, pkgdir.clone());
+
+        let mut package = DebPackage::new(&lulu.package.name);
+        let provides: Vec<&str> = lulu.package.provides.iter().map(String::as_str).collect();
+        let dependencies_runtime: Vec<&str> = lulu
+            .dependencies
+            .runtime
+            .iter()
+            .map(|d| d.0.as_str())
+            .collect();
+        let dependencies_optional: Vec<&str> = lulu
+            .dependencies
+            .optional
+            .iter()
+            .map(|d| d.0.as_str())
+            .collect();
+
+        package = package
+            .set_version(&version)
+            .set_description(&lulu.package.description)
+            .set_architecture(DebArchitecture::Amd64)
+            .set_maintainer(
+                lulu.package
+                    .maintainers
+                    .first()
+                    .expect("There should be at least one maintener"),
+            )
+            .with_provides(provides)
+            .with_depends(dependencies_runtime)
+            .with_recommends(dependencies_optional);
+
+        if lulu.package.preinst.is_some() {
+            package = package.preinst_from_str(&lulu.package.preinst.clone().unwrap());
         }
-        Ok(Fork::Child) => {
-            let srcdir = repo.path().parent().unwrap().to_path_buf();
 
-            let sudo = env::var("SUDO_USER");
-            if sudo.is_ok() && sudo.unwrap() != "" {
-                let uid: u32 = env::var("SUDO_UID").unwrap().parse().unwrap();
-                let gid: u32 = env::var("SUDO_GID").unwrap().parse().unwrap();
-                unsafe { libc::setuid(uid) };
-                unsafe { libc::setgid(gid) };
-            }
-
-            let pkgdir = path.join("LULU");
-            let mut builder = DirBuilder::new();
-            builder.recursive(true);
-            builder.create(pkgdir.clone().into_os_string()).unwrap();
-
-            generate(lulu.clone(), path, srcdir, pkgdir.clone());
-
-            let mut package = DebPackage::new(&lulu.package.name);
-            let provides: Vec<&str> = lulu.package.provides.iter().map(String::as_str).collect();
-            let dependencies_runtime: Vec<&str> = lulu
-                .dependencies
-                .runtime
-                .iter()
-                .map(|d| d.0.as_str())
-                .collect();
-            let dependencies_optional: Vec<&str> = lulu
-                .dependencies
-                .optional
-                .iter()
-                .map(|d| d.0.as_str())
-                .collect();
-
-            package = package
-                .set_version(&version)
-                .set_description(&lulu.package.description)
-                .set_architecture(DebArchitecture::Amd64)
-                .set_maintainer(
-                    lulu.package
-                        .maintainers
-                        .first()
-                        .expect("There should be at least one maintener"),
-                )
-                .with_provides(provides)
-                .with_depends(dependencies_runtime)
-                .with_recommends(dependencies_optional);
-
-            if lulu.package.preinst.is_some() {
-                package = package.preinst_from_str(&lulu.package.preinst.unwrap());
-            }
-
-            if lulu.package.postinst.is_some() {
-                package = package.postinst_from_str(&lulu.package.postinst.unwrap());
-            }
-
-            if lulu.package.prerm.is_some() {
-                package = package.prerm_from_str(&lulu.package.prerm.unwrap());
-            }
-
-            if lulu.package.postrm.is_some() {
-                package = package.postrm_from_str(&lulu.package.postrm.unwrap());
-            }
-
-            package = package
-                .with_dir(pkgdir, std::path::Path::new("").to_path_buf())
-                .unwrap();
-
-            package
-                .build()
-                .unwrap()
-                .write(File::create(format!("{}-{}.deb", lulu.package.name, version)).unwrap())
-                .unwrap();
-
-            std::process::exit(0);
+        if lulu.package.postinst.is_some() {
+            package = package.postinst_from_str(&lulu.package.postinst.clone().unwrap());
         }
-        Err(_) => error!("Fork failed"),
-    }
+
+        if lulu.package.prerm.is_some() {
+            package = package.prerm_from_str(&lulu.package.prerm.clone().unwrap());
+        }
+
+        if lulu.package.postrm.is_some() {
+            package = package.postrm_from_str(&lulu.package.postrm.clone().unwrap());
+        }
+
+        package = package
+            .with_dir(pkgdir, std::path::Path::new("").to_path_buf())
+            .unwrap();
+
+        package
+            .build()
+            .unwrap()
+            .write(File::create(format!("{}-{}.deb", lulu.package.name, version)).unwrap())
+            .unwrap();
+    });
 
     // Uninstalling
     title!("📦", "Uninstalling build dependencies");
@@ -431,23 +438,24 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
 }
 
 fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
-    let bash_command  = |script: String| Command::new("bash")
-        .env("basedir", basedir.display().to_string())
-        .env("srcdir", srcdir.display().to_string())
-        .env("pkgdir", pkgdir.display().to_string())
-        .arg("-ec")
-        .arg(script)
-        .spawn()
-        .expect("Failed to execute command")
-        .wait()
-        .unwrap()
-        .success();
+    let bash_command = |script: String| {
+        Command::new("bash")
+            .env("basedir", basedir.display().to_string())
+            .env("srcdir", srcdir.display().to_string())
+            .env("pkgdir", pkgdir.display().to_string())
+            .arg("-ec")
+            .arg(script)
+            .spawn()
+            .expect("Failed to execute command")
+            .wait()
+            .unwrap()
+            .success()
+    };
 
     // Prepare
     title!("🔧", "Preparing");
     if lulu.script.prepare.is_some() {
-        if !bash_command(lulu.script.prepare.unwrap())
-        {
+        if !bash_command(lulu.script.prepare.unwrap()) {
             error!("Prepare failed");
             std::process::exit(1);
         }
@@ -457,8 +465,7 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
     title!("🔨", "Building");
     env::set_current_dir(srcdir.display().to_string()).unwrap();
     if lulu.script.build.is_some() {
-        if !bash_command(lulu.script.build.unwrap())
-        {
+        if !bash_command(lulu.script.build.unwrap()) {
             error!("Build failed");
             std::process::exit(1);
         }
@@ -467,8 +474,7 @@ fn generate(lulu: Lulu, basedir: PathBuf, srcdir: PathBuf, pkgdir: PathBuf) {
     // Test
     title!("🪃", "Testing");
     if lulu.script.check.is_some() {
-        if !bash_command(lulu.script.check.unwrap())
-        {
+        if !bash_command(lulu.script.check.unwrap()) {
             error!("Test failed");
             std::process::exit(1);
         }

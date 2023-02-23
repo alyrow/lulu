@@ -182,9 +182,14 @@ pub mod git {
 }
 
 pub mod lulu {
+    use crate::error;
     use crate::package::Lulu;
+    use fork::{fork, Fork};
+    use log::trace;
+    use std::env;
     use std::io::{Error, Read};
     use std::path::Path;
+    use yansi::{Color, Paint};
 
     pub fn lulu_file<P: AsRef<Path>>(path: P) -> Result<Result<Lulu, toml::de::Error>, Error> {
         let file = std::fs::File::open(path)?;
@@ -192,6 +197,38 @@ pub mod lulu {
         let mut contents = String::new();
         buf_reader.read_to_string(&mut contents)?;
         Ok(toml::from_str(&contents))
+    }
+
+    pub fn fork_wait<F>(child: F) -> i32
+    where
+        F: Fn(),
+    {
+        let mut status: i32 = 0;
+        match fork() {
+            Ok(Fork::Parent(child)) => {
+                trace!(
+                    "Continuing execution in parent process, new child has pid: {}",
+                    child
+                );
+                unsafe { libc::waitpid(child, &mut status, 0) };
+                trace!("Status is {}", status);
+            }
+            Ok(Fork::Child) => {
+                let sudo = env::var("SUDO_USER");
+                if sudo.is_ok() && sudo.unwrap() != "" {
+                    let uid: u32 = env::var("SUDO_UID").unwrap().parse().unwrap();
+                    let gid: u32 = env::var("SUDO_GID").unwrap().parse().unwrap();
+                    unsafe { libc::setuid(uid) };
+                    unsafe { libc::setgid(gid) };
+                }
+
+                child();
+
+                std::process::exit(0);
+            }
+            Err(_) => error!("Fork failed"),
+        }
+        status
     }
 }
 
