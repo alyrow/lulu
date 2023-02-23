@@ -125,15 +125,15 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
             match Repository::open(path2.clone()) {
                 Ok(repo) => repo,
                 Err(_) => {
-                    let mut builder = DirBuilder::new();
-                    builder.recursive(true);
-                    builder.create(path2.clone().into_os_string()).unwrap();
-                    title!(
-                        "🔎",
-                        "Cloning source repository into {}",
-                        Paint::cyan(path2.clone().display()).underline()
-                    );
                     let status = fork_wait(|| {
+                        let mut builder = DirBuilder::new();
+                        builder.recursive(true);
+                        builder.create(path2.clone().into_os_string()).unwrap();
+                        title!(
+                            "🔎",
+                            "Cloning source repository into {}",
+                            Paint::cyan(path2.clone().display()).underline()
+                        );
                         match Repository::clone(&lulu.package.source, path2.clone()) {
                             Ok(repo) => repo,
                             Err(e) => {
