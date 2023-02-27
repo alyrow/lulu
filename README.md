@@ -23,6 +23,10 @@ If you want to build and install yourself lulu, you need to install the followin
 - fakeroot
 - libapt-pkg6.0
 
+```shell
+# apt install libapt-pkg-dev gcc pkg-config libssl-dev g++ fakeroot libapt-pkg6.0
+```
+
 [Setup a rust environment](https://rustup.rs/)
 
 Then run:
