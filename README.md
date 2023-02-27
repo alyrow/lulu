@@ -46,6 +46,7 @@ Commands:
   update   Update each repository and eventually inform about possible upgrades
   upgrade  Upgrade installed packages
   remove   Remove an installed package
+  list     List packages
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -111,6 +112,18 @@ If you want to purge the package:
 
 ```shell
 $ lulu remove -p package-name
+```
+
+### List package
+
+```shell
+$ lulu list
+```
+
+If you want to list installed packages:
+
+```shell
+$ lulu list -i
 ```
 
 ## Configuration
