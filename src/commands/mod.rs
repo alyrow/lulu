@@ -1,4 +1,5 @@
 mod install;
+mod list;
 mod remove;
 mod setup;
 mod update;
@@ -22,4 +23,8 @@ pub fn upgrade() {
 
 pub fn remove(name: String, purge: bool) {
     remove::remove(name, purge)
+}
+
+pub fn list(installed: bool) {
+    list::list(installed)
 }

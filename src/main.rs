@@ -9,7 +9,7 @@ use log::trace;
 use serde::Serialize;
 use yansi::Paint;
 
-use crate::commands::{install, remove, setup, update, upgrade};
+use crate::commands::{install, list, remove, setup, update, upgrade};
 
 /// Concept of package manager built on top of apt for handling git repositories
 #[derive(Parser)]
@@ -63,6 +63,12 @@ enum Commands {
         #[arg(short, long)]
         purge: bool,
     },
+    /// List packages
+    List {
+        /// List installed packages
+        #[arg(short, long)]
+        installed: bool,
+    },
 }
 
 fn main() {
@@ -92,6 +98,9 @@ fn main() {
         Some(Commands::Upgrade { .. }) => upgrade(),
         Some(Commands::Remove { name, purge }) => {
             remove(name.to_owned(), purge.to_owned());
+        }
+        Some(Commands::List { installed }) => {
+            list(installed.to_owned());
         }
         None => {
             update(true);
