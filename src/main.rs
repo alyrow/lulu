@@ -23,6 +23,7 @@ struct Cli {
     #[arg(short, long)]
     debug: bool,
 
+    /// Command to run
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -55,7 +56,7 @@ enum Commands {
     Upgrade {},
     /// Remove an installed package
     Remove {
-        // Package to uninstall
+        /// Package to uninstall
         name: String,
 
         /// Purge
