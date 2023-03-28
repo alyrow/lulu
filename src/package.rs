@@ -35,6 +35,7 @@ pub struct Dependencies {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Script {
     pub prepare: Option<String>,
+    pub pkgver: Option<String>,
     pub build: Option<String>,
     pub check: Option<String>,
     pub package: String,

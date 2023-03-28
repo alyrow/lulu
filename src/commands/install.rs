@@ -1,3 +1,6 @@
+use std::fs::read_to_string;
+use std::io::{BufRead, BufReader, Write};
+use std::process::Stdio;
 use std::{
     env,
     fs::{DirBuilder, File},
@@ -160,21 +163,62 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
     };
 
     // TODO: Go to a particular commit
-    let version = match repo.describe(&DescribeOptions::default()) {
-        Ok(d) => match d.format(None) {
-            Ok(s) => s.replace("-", ".").replace("v", ""),
-            Err(e) => {
-                error!("Failed to get version");
-                panic!("{:?}", e)
+    let mut version = String::new();
+    if lulu.script.pkgver.is_some() {
+        let status = fork_wait(|| {
+            let mut version = String::new();
+
+            let srcdir = repo.path().parent().unwrap().to_path_buf();
+
+            let mut child = Command::new("bash")
+                .env("srcdir", srcdir.display().to_string())
+                .arg("-ec")
+                .arg(lulu.script.pkgver.clone().unwrap())
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("Failed to execute command");
+
+            if let Some(ref mut stdout) = child.stdout {
+                for line in BufReader::new(stdout).lines() {
+                    let line = line.unwrap();
+                    version.push_str(&line);
+                }
             }
-        },
-        Err(_) => repo
-            .head()
-            .expect("There should be at least one commit")
-            .target()
-            .expect("The commit should point to a ref")
-            .to_string(),
-    };
+
+            if !child.wait().unwrap().success() {
+                error!("pkgver failed");
+                std::process::exit(1);
+            }
+
+            let mut output = File::create(".version").unwrap();
+            output.write_fmt(format_args!("{}", version)).unwrap();
+        });
+
+        // Verifying if status is ok
+        if status != 0 {
+            error!("Something went wrong");
+            panic!("Something went wrong, status is {status}");
+        }
+
+        version.push_str(&read_to_string(".version").unwrap());
+    } else {
+        version.push_str(&match repo.describe(&DescribeOptions::default()) {
+            Ok(d) => match d.format(None) {
+                Ok(s) => s.replace("-", ".").replace("v", ""),
+                Err(e) => {
+                    error!("Failed to get version");
+                    panic!("{:?}", e)
+                }
+            },
+            Err(_) => repo
+                .head()
+                .expect("There should be at least one commit")
+                .target()
+                .expect("The commit should point to a ref")
+                .to_string(),
+        })
+    }
+
     trace!("Version is {}", Paint::cyan(version.clone()));
 
     if sudo::check() != sudo::RunningAs::Root {
