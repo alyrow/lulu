@@ -330,7 +330,7 @@ fn install_with_ctx(path: PathBuf, lulu: Lulu, ctx: &mut Context) {
         .map(|pkg| cache.get(&pkg).expect("Should be in the cache"))
         .collect();
     for pkg in to_uninstall {
-        pkg.mark_delete(true);
+        pkg.mark_delete(false);
         pkg.protect();
     }
     let mut acquire_progress = AptAcquireProgress::new_box();
